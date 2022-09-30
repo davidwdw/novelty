@@ -1,8 +1,9 @@
 # novelty
-Create two folders: /data/ and /results/
-Unzip the data and rename the files into the following structure: 
-
-#### data:
+### Step 1: Pull the repo
+### Step 2: Create two folders: 
+- /data/
+- /results/
+### Step 3: Unzip and rename files into the following structure: 
 
 data/user_types.xlsx <br>
 data/xhs <br>
@@ -27,4 +28,4 @@ data/bilibili/posts/db8fff19-ccc7-43b3-8907-ba43f26b717e.xlsx <br>
 data/bilibili/comments.txt <br>
 data/bilibili/tags.xlsx <br>
 
-Then run the notebook by the order specified in the filenames
+### Step 4: Then run the notebook by the order specified
