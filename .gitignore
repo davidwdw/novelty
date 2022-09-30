@@ -6,4 +6,4 @@ __legacy__/**
 *.csv
 application/cache
 .ipynb_checkpoints/
-
+.gitignore
