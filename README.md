@@ -1,4 +1,5 @@
-# novelty
+# Test Novelty and Impact of Social Media Posts
+
 ### Step 1: Pull the repo
 ### Step 2: Create two folders: 
 - /data/
