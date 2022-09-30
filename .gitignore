@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+data/**
+results/**
+__legacy__/**
+*.csv
+application/cache
+.ipynb_checkpoints/
+
