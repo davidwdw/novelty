@@ -15,6 +15,6 @@ for novel_col in ['tags']:
     for kol_level in range(5):
         for time_int in ['d']:
             df_ = df[df['kol_level']==kol_level]
-            df_ = get_novelty(df_,novel_col,time_int)
+            df_ = get_novelty(df_,novel_col,time_int,parallel=2)
             df_.to_csv(f'./results/{analysis_unit}_\
 {kol_level}_{novel_col}_{time_int}.csv')

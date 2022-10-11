@@ -43,7 +43,7 @@ def convert_key_tag_top(df):
         
     return df
 
-def convert_key_tag_top_novelty(df):
+def convert_key_tag_top_novelty(df,date_col_name='post_date'):
     
     dfs = []
     to_remake = ['keywords','topics','tags']
@@ -60,7 +60,7 @@ def convert_key_tag_top_novelty(df):
     dfs = pd.concat(dfs,axis=1)
     df = df.drop(to_remake,axis=1).join(dfs)
     
-    return df
+    return df.rename(columns = {date_col_name:'datetime'})
 
 def flatten_list_to_set(ls_of_ls):
     return set([it for sl in ls_of_ls for it in sl])
@@ -207,10 +207,6 @@ def uzzi2013(posts,measure_col='topics',interval='m',datetime_col='datetime'):
     months = sorted(posts[datetime_col].value_counts().keys())
     n_posts_too_few_in_period = 0
     n_no_z_scores = 0
-    
-    print('\n\n')
-    print(f'no. of cores found: {cpu_count()}\n')
-    print(f'relying on 1 process')
 
     # we look at subgraphs by periods
     # here we use month but we can use days
@@ -359,7 +355,7 @@ def lee2015(posts,measure_col='topics',
 
     return posts
 
-def _uzzi2013_parallel_1_period(item):
+def uzzi2013_month(item):
     
     count,period,measure_col = item
     observed_freq = get_observed_freq(
@@ -411,7 +407,7 @@ def _uzzi2013_parallel_1_period(item):
         
     return period
 
-def uzzi2013_parallel_1(
+def uzzi2013_parallel(
     posts,measure_col='topics',interval='m',
     datetime_col='datetime'):
     
@@ -428,115 +424,28 @@ def uzzi2013_parallel_1(
     iteration = [(
         count,posts[posts[datetime_col]==month],
         measure_col) for count,month in enumerate(months)]
-    
-    print('\n\n')
+
     print(f'no. of cores found: {cpu_count()}\n')
     n_processes = min(len(iteration),cpu_count())
     print(f'relying on {n_processes} processes')
     pool = Pool(processes=n_processes)
-    results = list(tqdm.tqdm(pool.map(
-        _uzzi2013_parallel_1_period,iteration)))
+    results = list(tqdm.tqdm(pool.map(uzzi2013_month,iteration,100)))
     pool.close()
     pool.join()
     
     return pd.concat(results)
 
-def _uzzi2013_parallel_2_row(item):
-    
-    observed_freq,measure_col,idx,val = item
-    
-    z_score = {}
-    z_score['observed'] = {}
-    combos = get_pairwise_combo(val[measure_col])
-
-    for combo in combos:
-        z_score['observed'][combo] = observed_freq[combo]
-
-    for sim in range(20):
-        expected_freq = get_expected_freq(
-            observed_freq,False,True)
-
-        z_score[f'expected_{sim}'] = {}
-        for combo in get_pairwise_combo(val[measure_col]):                                            
-            z_score[f'expected_{sim}'][combo] = \
-            expected_freq[combo]
-
-    z_score = pd.DataFrame.from_dict(z_score)   
-
-    obs = z_score['observed']
-    exp = z_score.drop('observed',axis=1).mean(axis=1)
-    std = z_score.drop('observed',axis=1).std(axis=1)
-    z = ((obs-exp)/(std)).values
-    z = [val for val in z if val==val]
-
-    if z:
-        return (idx,np.nanmedian(z),np.nanpercentile(z,10))
-    else:
-        return (idx,np.NaN,np.NaN)
-    
-def uzzi2013_parallel_2(
-    posts,measure_col='topics',interval='m',
-    datetime_col='datetime'):
-
-    # first convert the datetime to the time interval we want
-    # then we can look at the subgraph for each time interval
-    try:
-        posts[datetime_col] = pd.to_datetime(
-            posts[datetime_col]).dt.to_period(interval)
-    except: pass
-    
-    months = sorted(posts[datetime_col].value_counts().keys())
-    z_scores = []
-
-    # we look at subgraphs by periods
-    # here we use month but we can use days
-    # depending on the dataset
-    for count,month in enumerate(months):
-        
-        period = posts[posts[datetime_col]==month]
-        observed_freq = get_observed_freq(
-            period,measure_col,True)
-        all_topics = set(
-            [it for sl in period[measure_col] for it in sl])
-
-        # if during the time period there is less than 2 post
-        # of if during the time period there are less than 5 topics
-        # which means that there are too few nodes
-        if (len(all_topics)>=4) & (len(period)>=2):
-
-            iteration = [(observed_freq,measure_col,idx,val) for\
-                         idx,val in period.iterrows()]
-            print('\n\n')
-            print(f'no. of cores found: {cpu_count()}\n')
-            n_processes = min(len(iteration),cpu_count())
-            print(f'relying on {n_processes} processes')
-            pool = Pool(processes=n_processes)
-            results = list(tqdm.tqdm(pool.map(_uzzi2013_parallel_2_row,iteration,100)))
-            pool.close()
-            pool.join()
-            z_scores+=results
-            
-    z_scores = pd.DataFrame(z_scores,columns=[
-        'index','novelty_median','novelty_tenth'])
-            
-    return posts.join(z_scores.set_index('index'))
-
-def get_novelty(df,measure_col='topics',interval='m',parallel=1):
+def get_novelty(df,measure_col='topics',interval='m',parallel=True):
 
     start_time = dt.datetime.now()
     
-    if parallel==0:
-        df = uzzi2013(
-            df,
-            measure_col=measure_col,
-            interval=interval)
-    elif parallel==1:
-        df = uzzi2013_parallel_1(
+    if parallel:
+        df = uzzi2013_parallel(
             df,
             measure_col=measure_col,
             interval=interval)
     else:
-        df = uzzi2013_parallel_2(
+        df = uzzi2013(
             df,
             measure_col=measure_col,
             interval=interval)
@@ -544,3 +453,9 @@ def get_novelty(df,measure_col='topics',interval='m',parallel=1):
     print(f"total processing time:",
           dt.datetime.now() - start_time)
     return df
+
+
+posts = convert_key_tag_top_novelty(pd.read_csv('./data/xhs/users_clean.csv',
+                                                index_col='index'),'crawl_date')
+_ = get_novelty(posts,parallel=True)
+_ = get_novelty(posts,parallel=False)
